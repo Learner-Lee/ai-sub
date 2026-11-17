@@ -85,6 +85,15 @@ async def fetch_and_notify() -> None:
                 mark_notified(filtered.source_id)
             except Exception as e:
                 logger.error("Failed to notify for %s: %s", filtered.source_id, e, exc_info=True)
+        else:
+            logger.info(
+                "Skipping release notification for %s: vendor=%s tier=%s importance=%s allowed=%s",
+                filtered.source_id,
+                filtered.vendor,
+                tier,
+                filtered.importance.value,
+                sorted(i.value for i in allowed),
+            )
 
 
 async def daily_digest() -> None:
@@ -133,6 +142,13 @@ async def fetch_and_notify_blogs() -> None:
                 mark_blog_notified(filtered.source_id)
             except Exception as e:
                 logger.error("Failed to notify blog %s: %s", filtered.source_id, e, exc_info=True)
+        else:
+            logger.info(
+                "Skipping blog notification for %s: importance=%s allowed=%s",
+                filtered.source_id,
+                filtered.importance.value,
+                ["high", "medium"],
+            )
 
     # Process release articles (from RSS feeds with notifyAs="release")
     new_releases = [a for a in release_articles if not is_seen(a.source_id)]
@@ -161,6 +177,13 @@ async def fetch_and_notify_blogs() -> None:
                 mark_notified(filtered_release.source_id)
             except Exception as e:
                 logger.error("Failed to notify release %s: %s", filtered_release.source_id, e, exc_info=True)
+        else:
+            logger.info(
+                "Skipping RSS release notification for %s: importance=%s allowed=%s",
+                filtered_release.source_id,
+                filtered_release.importance.value,
+                ["high", "medium"],
+            )
 
 
 async def fetch_and_notify_sitemap(source: SitemapSource) -> None:
@@ -214,6 +237,13 @@ async def _process_sitemap_as_release(source: SitemapSource, all_articles: list)
                 mark_notified(filtered.source_id)
             except Exception as e:
                 logger.error("Failed to notify sitemap %s: %s", filtered.source_id, e, exc_info=True)
+        else:
+            logger.info(
+                "Skipping sitemap release notification for %s: importance=%s allowed=%s",
+                filtered.source_id,
+                filtered.importance.value,
+                ["high", "medium"],
+            )
 
 
 async def _process_sitemap_as_blog(source: SitemapSource, all_articles: list) -> None:
@@ -237,6 +267,13 @@ async def _process_sitemap_as_blog(source: SitemapSource, all_articles: list) ->
                 mark_blog_notified(filtered.source_id)
             except Exception as e:
                 logger.error("Failed to notify sitemap %s: %s", filtered.source_id, e, exc_info=True)
+        else:
+            logger.info(
+                "Skipping sitemap blog notification for %s: importance=%s allowed=%s",
+                filtered.source_id,
+                filtered.importance.value,
+                ["high", "medium"],
+            )
 
 
 async def daily_blog_digest() -> None:

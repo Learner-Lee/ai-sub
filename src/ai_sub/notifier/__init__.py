@@ -9,6 +9,19 @@ from ai_sub.notifier.feishu import send_feishu
 logger = logging.getLogger(__name__)
 
 
+async def _run_notification_tasks(tasks: list[asyncio.Task], label: str) -> None:
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    errors = [r for r in results if isinstance(r, Exception)]
+    for r in errors:
+        logger.error("%s failed: %s", label, r, exc_info=r)
+
+    if errors and len(errors) == len(results):
+        raise RuntimeError(f"All {label} channel(s) failed")
+
+    if errors:
+        logger.warning("%d of %d %s channel(s) failed", len(errors), len(results), label)
+
+
 async def notify_all(release: FilteredRelease) -> None:
     tasks: list[asyncio.Task] = []
     if settings.telegram_enabled and settings.telegram_bot_token and settings.telegram_chat_id:
@@ -18,10 +31,7 @@ async def notify_all(release: FilteredRelease) -> None:
     if not tasks:
         logger.warning("No notification channels configured")
         return
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error("Notification failed: %s", r, exc_info=r)
+    await _run_notification_tasks(tasks, "notification")
 
 
 async def notify_digest(text_html: str, card_elements: list[dict]) -> None:
@@ -41,10 +51,7 @@ async def notify_digest(text_html: str, card_elements: list[dict]) -> None:
     if not tasks:
         logger.warning("No notification channels configured for digest")
         return
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error("Digest notification failed: %s", r, exc_info=r)
+    await _run_notification_tasks(tasks, "digest notification")
 
 
 async def notify_blog(article: FilteredBlogArticle) -> None:
@@ -58,10 +65,7 @@ async def notify_blog(article: FilteredBlogArticle) -> None:
     if not tasks:
         logger.debug("No blog notification channels configured")
         return
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error("Blog notification failed: %s", r, exc_info=r)
+    await _run_notification_tasks(tasks, "blog notification")
 
 
 async def notify_blog_digest(text_html: str, card_elements: list[dict]) -> None:
@@ -83,7 +87,4 @@ async def notify_blog_digest(text_html: str, card_elements: list[dict]) -> None:
     if not tasks:
         logger.debug("No blog digest notification channels configured")
         return
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error("Blog digest notification failed: %s", r, exc_info=r)
+    await _run_notification_tasks(tasks, "blog digest notification")

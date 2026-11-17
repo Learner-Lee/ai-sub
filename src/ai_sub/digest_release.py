@@ -34,9 +34,12 @@ def build_telegram_digest(releases: list[dict]) -> str:
         lines.append(f"<b>{e(vendor.upper())}</b>")
         for r in items:
             emoji = IMPORTANCE_EMOJI.get(r.get("importance", "medium"), "\u2705")
-            title = e(r.get("title_zh") or r.get("title", ""))
+            title = e(r.get("title", ""))
+            title_zh = r.get("title_zh") or ""
             url = r.get("url", "")
             lines.append(f"{emoji} <a href=\"{e(url)}\">{title}</a>")
+            if title_zh and title_zh != r.get("title", ""):
+                lines.append(f"   \u4e2d\u6587\uff1a{e(title_zh)}")
         lines.append("")
 
     lines.append(f"共 {len(releases)} 条更新")
@@ -65,9 +68,12 @@ def build_feishu_digest_elements(releases: list[dict]) -> list[dict]:
         release_lines = []
         for r in items:
             emoji = IMPORTANCE_EMOJI.get(r.get("importance", "medium"), "\u2705")
-            title = r.get("title_zh") or r.get("title", "")
+            title = r.get("title", "")
+            title_zh = r.get("title_zh") or ""
             url = r.get("url", "")
             release_lines.append(f"{emoji} [{title}]({url})")
+            if title_zh and title_zh != title:
+                release_lines.append(f"   \u4e2d\u6587\uff1a{title_zh}")
 
         elements.append({
             "tag": "div",

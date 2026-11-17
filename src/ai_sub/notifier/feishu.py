@@ -1,7 +1,9 @@
 """Feishu webhook notifications using Interactive Card format."""
 from __future__ import annotations
 
+import asyncio
 import logging
+import re
 from functools import lru_cache
 
 import httpx
@@ -32,8 +34,9 @@ IMPORTANCE_LABEL = {
 def _build_card(r: FilteredRelease) -> dict:
     color = IMPORTANCE_COLOR.get(r.importance, "yellow")
     label = IMPORTANCE_LABEL.get(r.importance, IMPORTANCE_LABEL[Importance.MEDIUM])
-    title = r.title_zh or r.title
-    summary = r.summary_zh or r.summary
+    title = r.title
+    title_zh = r.title_zh if r.title_zh and r.title_zh != r.title else ""
+    summary_zh = r.summary_zh if r.summary_zh and r.summary_zh != r.summary else ""
 
     meta = f"{r.vendor} · {r.product}"
     if r.version:
@@ -45,10 +48,28 @@ def _build_card(r: FilteredRelease) -> dict:
             "text": {"tag": "lark_md", "content": f"**{label}** | *{meta}*"},
         },
         {"tag": "hr"},
+    ]
+
+    if title_zh:
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": f"**中文标题**\n{title_zh}"},
+        })
+
+    elements.extend([
         {
             "tag": "div",
-            "text": {"tag": "lark_md", "content": summary},
+            "text": {"tag": "lark_md", "content": f"**English**\n{r.summary}"},
         },
+    ])
+
+    if summary_zh:
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": f"**中文翻译**\n{summary_zh}"},
+        })
+
+    elements.append(
         {
             "tag": "action",
             "actions": [
@@ -60,7 +81,7 @@ def _build_card(r: FilteredRelease) -> dict:
                 }
             ],
         },
-    ]
+    )
 
     return {
         "msg_type": "interactive",
@@ -98,20 +119,52 @@ async def send_feishu_card(
 
 
 async def _post_webhook(payload: dict, webhook_url: str | None = None) -> None:
-    url = webhook_url or settings.feishu_release_webhook_url
+    urls = _webhook_urls(webhook_url or settings.feishu_release_webhook_url)
+    if not urls:
+        logger.warning("No Feishu webhook URL configured")
+        return
+
+    results = await asyncio.gather(
+        *(_post_one_webhook(idx, url, payload) for idx, url in enumerate(urls, start=1)),
+        return_exceptions=True,
+    )
+    errors = [r for r in results if isinstance(r, Exception)]
+    success_count = len(results) - len(errors)
+    if errors and success_count > 0:
+        logger.warning(
+            "%d of %d Feishu webhook(s) failed; notification delivered to %d",
+            len(errors),
+            len(results),
+            success_count,
+        )
+    elif errors:
+        raise RuntimeError(f"All {len(errors)} Feishu webhook(s) failed")
+
+
+def _webhook_urls(value: str) -> list[str]:
+    return [url.strip() for url in re.split(r"[,，;\n]+", value) if url.strip()]
+
+
+async def _post_one_webhook(index: int, url: str, payload: dict) -> None:
     resp = await _get_client().post(url, json=payload)
-    result = resp.json()
+    try:
+        result = resp.json()
+    except ValueError as e:
+        logger.error("Feishu webhook #%d returned non-JSON response: HTTP %d", index, resp.status_code)
+        raise RuntimeError(f"Feishu webhook #{index} returned non-JSON response") from e
+
     if result.get("code") != 0:
-        logger.error("Feishu webhook error: %s", result)
-        raise RuntimeError(f"Feishu error: {result}")
-    logger.info("Feishu notification sent")
+        logger.error("Feishu webhook #%d error: %s", index, result)
+        raise RuntimeError(f"Feishu webhook #{index} error: {result}")
+    logger.info("Feishu notification sent via webhook #%d", index)
 
 
 def _build_blog_card(a: FilteredBlogArticle) -> dict:
     color = IMPORTANCE_COLOR.get(a.importance, "yellow")
     label = IMPORTANCE_LABEL.get(a.importance, IMPORTANCE_LABEL[Importance.MEDIUM])
-    title = a.title_zh or a.title
-    summary = a.summary_zh or a.summary
+    title = a.title
+    title_zh = a.title_zh if a.title_zh and a.title_zh != a.title else ""
+    summary_zh = a.summary_zh if a.summary_zh and a.summary_zh != a.summary else ""
     cat_tag = f"[{a.ai_category}] " if a.ai_category else ""
     meta = a.blog_name
 
@@ -121,10 +174,28 @@ def _build_blog_card(a: FilteredBlogArticle) -> dict:
             "text": {"tag": "lark_md", "content": f"**{label}** | {cat_tag}*{meta}*"},
         },
         {"tag": "hr"},
+    ]
+
+    if title_zh:
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": f"**中文标题**\n{title_zh}"},
+        })
+
+    elements.extend([
         {
             "tag": "div",
-            "text": {"tag": "lark_md", "content": summary},
+            "text": {"tag": "lark_md", "content": f"**English**\n{a.summary}"},
         },
+    ])
+
+    if summary_zh:
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": f"**中文翻译**\n{summary_zh}"},
+        })
+
+    elements.append(
         {
             "tag": "action",
             "actions": [
@@ -136,7 +207,7 @@ def _build_blog_card(a: FilteredBlogArticle) -> dict:
                 }
             ],
         },
-    ]
+    )
 
     return {
         "msg_type": "interactive",

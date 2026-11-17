@@ -66,21 +66,39 @@ IMPORTANCE_LABEL = {
 def _format_release(r: FilteredRelease) -> str:
     label = IMPORTANCE_LABEL.get(r.importance, IMPORTANCE_LABEL[Importance.MEDIUM])
     e = html.escape
-    title = r.title_zh or r.title
-    summary = r.summary_zh or r.summary
+    title_zh = r.title_zh if r.title_zh and r.title_zh != r.title else ""
+    summary_zh = r.summary_zh if r.summary_zh and r.summary_zh != r.summary else ""
     meta = f"{e(r.vendor)} · {e(r.product)}"
     if r.version:
         meta += f" · {e(r.version)}"
 
     lines = [
         f"{label}",
-        f"<b>{e(title)}</b>",
+        f"<b>{e(r.title)}</b>",
         f"<i>{meta}</i>",
         "",
-        e(summary),
+    ]
+    if title_zh:
+        lines.extend([
+            f"<b>中文标题</b>",
+            e(title_zh),
+            "",
+        ])
+    lines.extend([
+        "<b>English</b>",
+        e(r.summary),
+        "",
+    ])
+    if summary_zh:
+        lines.extend([
+            "<b>中文翻译</b>",
+            e(summary_zh),
+            "",
+        ])
+    lines.extend([
         "",
         f'<a href="{e(r.url)}">查看原文</a>',
-    ]
+    ])
     return "\n".join(lines)
 
 
@@ -122,20 +140,38 @@ async def send_telegram_raw(
 def _format_blog_article(a: FilteredBlogArticle) -> str:
     label = IMPORTANCE_LABEL.get(a.importance, IMPORTANCE_LABEL[Importance.MEDIUM])
     e = html.escape
-    title = a.title_zh or a.title
-    summary = a.summary_zh or a.summary
+    title_zh = a.title_zh if a.title_zh and a.title_zh != a.title else ""
+    summary_zh = a.summary_zh if a.summary_zh and a.summary_zh != a.summary else ""
     cat_tag = f"[{e(a.ai_category)}] " if a.ai_category else ""
     meta = e(a.blog_name)
 
     lines = [
         f"{label}",
-        f"<b>{cat_tag}{e(title)}</b>",
+        f"<b>{cat_tag}{e(a.title)}</b>",
         f"<i>{meta}</i>",
         "",
-        e(summary),
+    ]
+    if title_zh:
+        lines.extend([
+            f"<b>中文标题</b>",
+            e(title_zh),
+            "",
+        ])
+    lines.extend([
+        "<b>English</b>",
+        e(a.summary),
+        "",
+    ])
+    if summary_zh:
+        lines.extend([
+            "<b>中文翻译</b>",
+            e(summary_zh),
+            "",
+        ])
+    lines.extend([
         "",
         f'<a href="{e(a.url)}">\u67e5\u770b\u539f\u6587</a>',
-    ]
+    ])
     return "\n".join(lines)
 
 

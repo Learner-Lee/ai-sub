@@ -35,15 +35,18 @@ async def _openai_chat(system_prompt: str, user_message: str) -> dict:
     if settings.openai_base_url:
         kwargs["base_url"] = settings.openai_base_url
     client = AsyncOpenAI(api_key=settings.openai_api_key, **kwargs)
-    resp = await client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
+    create_kwargs: dict = {
+        "model": settings.openai_model,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ],
-        response_format={"type": "json_object"},
-        reasoning_effort="none",
-    )
+        "response_format": {"type": "json_object"},
+    }
+    if not settings.openai_base_url:
+        create_kwargs["reasoning_effort"] = "none"
+
+    resp = await client.chat.completions.create(**create_kwargs)
     raw = resp.choices[0].message.content or "{}"
     return json.loads(raw)
 

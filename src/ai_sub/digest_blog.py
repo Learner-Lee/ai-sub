@@ -34,9 +34,12 @@ def build_telegram_blog_digest(articles: list[dict]) -> str:
         lines.append(f"<b>{e(blog_name)}</b>")
         for a in items:
             emoji = IMPORTANCE_EMOJI.get(a.get("importance", "medium"), "\u2705")
-            title = e(a.get("title_zh") or a.get("title", ""))
+            title = e(a.get("title", ""))
+            title_zh = a.get("title_zh") or ""
             url = a.get("url", "")
             lines.append(f"{emoji} <a href=\"{e(url)}\">{title}</a>")
+            if title_zh and title_zh != a.get("title", ""):
+                lines.append(f"   \u4e2d\u6587\uff1a{e(title_zh)}")
         lines.append("")
 
     lines.append(f"\u5171 {len(articles)} \u7bc7\u6587\u7ae0")
@@ -65,9 +68,12 @@ def build_feishu_blog_digest_elements(articles: list[dict]) -> list[dict]:
         article_lines = []
         for a in items:
             emoji = IMPORTANCE_EMOJI.get(a.get("importance", "medium"), "\u2705")
-            title = a.get("title_zh") or a.get("title", "")
+            title = a.get("title", "")
+            title_zh = a.get("title_zh") or ""
             url = a.get("url", "")
             article_lines.append(f"{emoji} [{title}]({url})")
+            if title_zh and title_zh != title:
+                article_lines.append(f"   \u4e2d\u6587\uff1a{title_zh}")
 
         elements.append({
             "tag": "div",
